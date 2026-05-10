@@ -66,48 +66,34 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 	comp.dimension = axis;
 
 	std::sort(objects.begin() + left_index, objects.begin() + right_index, comp);
-	
 
 	// mean com o centro dos centroids????
-	int mid = left_index + (right_index - left_index) / 2;
-	float partition = (objects[mid]->getCentroid().getAxisValue(comp.dimension) +
-				objects[mid - 1]->getCentroid().getAxisValue(comp.dimension)) / 2.0f;
+    float centroid_sum = 0.0f;
+    for (int i = left_index; i < right_index; i++) {
+        centroid_sum += objects[i]->getCentroid().getAxisValue(axis);
+    }
+    float centroid_mean = centroid_sum / (right_index - left_index);
 
-	int split_index = -1;
-	Vector min = Vector(FLT_MAX, FLT_MAX, FLT_MAX);
-	Vector max = Vector(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-	AABB left_bbox = AABB(min, max), right_bbox = AABB(min, max);
-	
-	for (int i = left_index; i < right_index; i++) {
-		if (split_index == -1) {
-			left_bbox.extend(objects[i]->GetBoundingBox());
-			if (objects[i]->getCentroid().getAxisValue(comp.dimension) >= partition) {
-				split_index = i;
-			}
-		}
-		else {
-			right_bbox.extend(objects[i]->GetBoundingBox());
-		}
-	}
+    int split_index = left_index;
+    while (split_index < right_index &&
+           objects[split_index]->getCentroid().getAxisValue(axis) < centroid_mean) {
+        split_index++;
+    }
 
-	// Vector min = Vector(FLT_MAX, FLT_MAX, FLT_MAX), max = Vector(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-	// AABB left_bbox = AABB(min, max);
-	// AABB right_bbox = AABB(min, max);
-	// for (int i = left_index; i < split_index; i++) {
-	// 	left_bbox.extend(objects[i]->GetBoundingBox());
-	// }
-	// for (int i = split_index; i < right_index; i++) {
-	// 	right_bbox.extend(objects[i]->GetBoundingBox());
-	// }
+    if (split_index == left_index || split_index == right_index) {
+        split_index = (left_index + right_index) / 2;
+    }
 
-	if (split_index == -1) {
-		split_index = right_index;
-	}
-
-	if (split_index == left_index || split_index == right_index) {
-		node->makeLeaf(left_index, right_index);
-		return;
-	}
+    // Build child boxes
+    Vector min(FLT_MAX, FLT_MAX, FLT_MAX), max(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+    AABB left_bbox(min, max);
+    AABB right_bbox(min, max);
+    for (int i = left_index; i < split_index; i++) {
+        left_bbox.extend(objects[i]->GetBoundingBox());
+    }
+    for (int i = split_index; i < right_index; i++) {
+        right_bbox.extend(objects[i]->GetBoundingBox());
+    }
 
 	node->makeNode(nodes.size()); // left child index in nodes vector
 
@@ -128,81 +114,6 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 	build_recursive(left_index, split_index, left);
 	build_recursive(split_index, right_index, right);
 }
-
-// void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
-
-//     //right_index, left_index and split_index refer to the indices in the objects vector
-//     // do not confuse with left_nodde_index and right_node_index which refer to indices in the nodes vector. 
-//     // node.index can have a index of objects vector or a index of nodes vector
-
-//     if (right_index - left_index <= Threshold) {  //leaf node
-//         node->makeLeaf(left_index, right_index - left_index);
-//         return;
-//     }
-
-//     // find largest axis and sort
-//     Vector extent = node->getAABB().max - node->getAABB().min;
-//     int axis = 0; // x-axis
-//     if (extent.y > extent.x && extent.y > extent.z) 
-//         axis = 1; // y-axis
-//     else if (extent.z > extent.x && extent.z > extent.y) 
-//         axis = 2; // z-axis
-
-//     Comparator comp;
-//     comp.dimension = axis;
-//     sort(objects.begin() + left_index, objects.begin() + right_index, comp);
-    
-//     // calculate midpoint (avoid empty nodes - use mean object distribution)
-//     // TODO CHECK IF THIS IS THE INTENDED WAY
-//     float centroid_sum = 0.0f;
-//     for (int i = left_index; i < right_index; i++) {
-//         centroid_sum += objects[i]->getCentroid().getAxisValue(axis);
-//     }
-//     float centroid_mean = centroid_sum / (right_index - left_index);
-
-//     int split_index = left_index;
-//     while (split_index < right_index &&
-//            objects[split_index]->getCentroid().getAxisValue(axis) < centroid_mean) {
-//         split_index++;
-//     }
-
-//     if (split_index == left_index || split_index == right_index) {
-//         split_index = (left_index + right_index) / 2;
-//     }
-
-//     // Build child boxes
-//     Vector lmin(FLT_MAX, FLT_MAX, FLT_MAX), lmax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-//     AABB leftBox(lmin, lmax);
-//     for (int i = left_index; i < split_index; i++) {
-//         leftBox.extend(objects[i]->GetBoundingBox());
-//     }
-
-//     Vector rmin(FLT_MAX, FLT_MAX, FLT_MAX), rmax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-//     AABB rightBox(rmin, rmax);
-//     for (int i = split_index; i < right_index; i++) {
-//         rightBox.extend(objects[i]->GetBoundingBox());
-//     }
-    
-//     // Create children; parent stores LEFT child index
-//     BVHNode* left_node = new BVHNode();
-//     BVHNode* right_node = new BVHNode();
-//     left_node->setAABB(leftBox);
-//     right_node->setAABB(rightBox);
-
-//     // initiate current node as an interior node with left node and right node as children
-//     // parent stores LEFT child index
-//     unsigned int left_node_index = (unsigned int)nodes.size();
-//     node->makeNode(left_node_index);
-
-//     // push back child nodes to the nodes vector 
-//     nodes.push_back(left_node);
-//     nodes.push_back(right_node);
-
-//     // Recurse
-//     build_recursive(left_index, split_index, left_node);
-//     build_recursive(split_index, right_index, right_node);
-			
-// }
 
 // Closest hit 
 bool BVH::Traverse(Ray& ray, Object** hit_obj, HitRecord& hitRec) {

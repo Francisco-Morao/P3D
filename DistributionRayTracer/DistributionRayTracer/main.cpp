@@ -500,7 +500,7 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 		float n1 = ior_1;
 		float n2 = mat->GetRefrIndex();
 
-		Vector N = entering ? N : N * (-1.0f); // normal should point against the ray direction
+		Vector Nf = entering ? N : N * (-1.0f); // normal should point against the ray direction
 		if (!entering) {
 			n2 = n1;
 			n1 = mat->GetRefrIndex();
@@ -509,7 +509,7 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 		float R0 = powf((n1 - n2) / (n1 + n2), 2.0f);
 
 		Vector v = ray.direction * (-1.0f); // view vector
-		Vector vt = N * (v * N) - v;
+		Vector vt = Nf * (v * Nf) - v;
 		Vector t = vt;
 		t.normalize();
 
@@ -527,15 +527,18 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 			// rColor = rayTracing(scene, point, rRay direction, depth+1);
 			// reduce rColor by the specular reflection coefficient and add to color; }
 
-			Vector r = ray.direction - N * 2.0f * (ray.direction * N);
+			Vector r = ray.direction - Nf * 2.0f * (ray.direction * N);
 			Color rColor;
 			Ray rRay;
 
-            if (roughness > 0)
+            if (roughness > 0){
                 r = r + rnd_unit_sphere() * roughness;
+				if (r * N < 0)
+					r = ray.direction - Nf * 2.0f * (ray.direction * N);
+			}
                 
             r.normalize();
-            rRay.origin = hitPoint + N * EPSILON;
+            rRay.origin = hitPoint + Nf * EPSILON;
 			rRay.direction = r;
 			rColor = rayTracing(rRay, depth + 1, ior_1, lightSample);
 
@@ -548,8 +551,8 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 			// reduce tColor by the transmittance coefficient and add to color; }
 
 			Ray rRay;
-			rRay.origin = hitPoint - N * EPSILON; // refracted ray origin is slightly offset from the hit point in the opposite direction of the normal to avoid self-intersection
-			rRay.direction = t * sinThetat - N * cosThetat;
+			rRay.origin = hitPoint - Nf * EPSILON; // refracted ray origin is slightly offset from the hit point in the opposite direction of the normal to avoid self-intersection
+			rRay.direction = t * sinThetat - Nf * cosThetat;
 			rRay.direction.normalize();
 
 			Color color = rayTracing(rRay, depth + 1, n2, lightSample);
