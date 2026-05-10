@@ -154,3 +154,187 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
 
 	return false;  //no primitive intersection	
 }		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Closest hit 
+bool BVH::Traverse(Ray& ray, Object** hit_obj, HitRecord& hitRec) {
+	
+		float tmp;
+		bool hit = false;
+		stack<StackItem> hit_stack;
+		HitRecord rec;   //rec.isHit initialized to false and rec.t initialized with FLT_MAX
+
+		BVHNode* currentNode = nodes[0];
+		// PUT YOUR CODE HERE
+
+		/*
+		LocalRay = Ray, CurrentNode = nodes[0] //Root
+		• Check LocalRay intersection with Root (world box)
+			– No hit => return false
+		• For (infinity)
+			– If (NOT CurrentNode.isLeaf())
+				• Intersection test with both child nodes
+					– Both nodes hit => Put the one furthest away on the stack. CurrentNode = closest node
+						» continue
+					– Only one node hit => CurrentNode = hit node
+						» continue
+					– No Hit: Do nothing (let the stack-popping code below be reached)
+			– Else // Is leaf
+				• For each primitive in leaf perform intersection testing
+					– Intersected => update tclosest and store ClosestHit
+			– EndIf
+			– Pop stack until you find a node with t < tclosest => CurrentNode = pop’d
+				• Stack is empty? => return ClosestHit (no closest hit => return false, otherwise return true)
+		• EndFor
+		*/
+
+		// Check LocalRay intersection with Root (world box)
+		//		– No hit = > return false
+		if (!currentNode->getAABB().hit(ray, tmp)) {
+			return false;
+		}
+
+		while (true) {
+			if (!currentNode->isLeaf()) {
+				BVHNode* leftNode = nodes[currentNode->getIndex()];
+				BVHNode* rightNode = nodes[currentNode->getIndex() + 1];
+
+				float tmp_left, tmp_right;
+				bool left_hit = leftNode->getAABB().hit(ray, tmp_left);
+				bool right_hit = rightNode->getAABB().hit(ray, tmp_right);
+
+				if (left_hit && right_hit) {
+					if (tmp_left < tmp_right) {
+						hit_stack.push(StackItem(rightNode, tmp_right));
+						currentNode = leftNode;
+					}
+					else {
+						hit_stack.push(StackItem(leftNode, tmp_left));
+						currentNode = rightNode;
+					}
+					continue;
+				}
+				else if (left_hit || right_hit) {
+					currentNode = left_hit ? leftNode : rightNode;
+					continue;
+				}
+				// else do nothing no hit
+			}
+			else {
+				for (int i = currentNode->getIndex(); i < currentNode->getIndex() + currentNode->getNObjs(); i++) {
+					rec = objects[i]->hit(ray);
+					if (rec.isHit && rec.t < hitRec.t) {
+						hitRec = rec;
+						*hit_obj = objects[i];
+						hit = true;
+					}
+				}
+			}
+			if (hit_stack.empty()) {
+				break;  //traversal finished
+			}
+			StackItem item = hit_stack.top();
+			hit_stack.pop();
+
+			// skip nodes that are farther than the closest hit found so far
+			while (item.t > hitRec.t) {
+				if (hit_stack.empty())
+					return hit;
+				item = hit_stack.top();
+				hit_stack.pop();
+			}
+
+			currentNode = item.ptr;
+		}
+		return hit;
+}
+
+bool BVH::Traverse(Ray& ray) {  //shadow ray with length
+		float tmp;
+		stack<StackItem> hit_stack;
+		HitRecord rec;
+		/*
+		LocalRay = Ray, CurrentNode = nodes[0]; //root
+		• Check LocalRay intersection with Root (world box)
+			– No hit => return false
+		• For (infinity)
+			– If (NOT CurrentNode.isLeaf())
+				• Intersection test with both child nodes
+					– Both nodes hit => Put right one on the stack. CurrentNode = left node
+						» Goto LOOP;
+					– Only one node hit => CurrentNode = hit node
+						» Goto LOOP;
+					– No Hit: Do nothing (let the stack-popping code below be reached)
+			– Else // Is leaf
+				• For each primitive in leaf perform intersection testing
+					– Intersected => return true;
+			– EndIf
+			– Pop stack, CurrentNode = pop’d node
+				• Stack is empty => return false
+		• EndFor*/
+
+		BVHNode* currentNode = nodes[0];
+
+		if (!currentNode->getAABB().hit(ray, tmp)) {
+			return false;
+		}
+
+		while (true){
+			if (!currentNode->isLeaf()) {
+				BVHNode* leftNode = nodes[currentNode->getIndex()];
+				BVHNode* rightNode = nodes[currentNode->getIndex() + 1];
+
+				float tmp_left, tmp_right;
+				bool left_hit = leftNode->getAABB().hit(ray, tmp_left);
+				bool right_hit = rightNode->getAABB().hit(ray, tmp_right);
+
+				if (left_hit && right_hit) {
+					hit_stack.push(StackItem(rightNode, tmp_right));
+					currentNode = leftNode;
+					continue;
+				}
+				else if (left_hit || right_hit) {
+					currentNode = left_hit ? leftNode : rightNode;
+					continue;
+				}
+			}
+			else {
+				for (int i = currentNode->getIndex(); i < currentNode->getIndex() + currentNode->getNObjs(); i++) {
+					HitRecord tmpRec = objects[i]->hit(ray);
+					if (tmpRec.isHit && tmpRec.t < rec.t) {
+						return true;
+					}
+				}
+			}
+
+			// pop
+			if (!hit_stack.empty()) {
+				currentNode = hit_stack.top().ptr;
+				hit_stack.pop();
+			}
+			else {
+				return false;
+			}
+		}
+
+		return false;  //no primitive intersection
+}		
