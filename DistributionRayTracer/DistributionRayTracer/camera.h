@@ -82,7 +82,7 @@ public:
 		float px = w * ((pixel_sample.x / res_x) - 0.5f);
 		float py = h * ((pixel_sample.y / res_y) - 0.5f);
 
-		ray_dir = u * (w * px) + v * (h * py) - n * distance;
+		ray_dir = u * (px) + v * (py) - n * distance;
 
 		ray_dir.normalize();
 
