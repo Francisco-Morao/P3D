@@ -50,7 +50,7 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 	// node.index can have a index of objects vector or a index of nodes vector
 	
 	if ((right_index - left_index) < Threshold) {
-		node->makeLeaf(left_index, right_index);
+		node->makeLeaf(left_index, right_index - left_index);
 		return;
 	}
 	Comparator comp;
@@ -261,7 +261,7 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
     Ray localRay = ray; //copy of the original ray to be transformed into local coordinates of each node
     BVHNode* currentNode = nodes[0];
 
-    if (!currentNode->getAABB().hit(ray, tmp)) {
+    if (!currentNode->getAABB().hit(localRay, tmp)) {
         return false;
     }
 
@@ -271,8 +271,8 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
             BVHNode* rightNode = nodes[currentNode->getIndex() + 1];
 
             float tmp_left, tmp_right;
-            bool left_hit = leftNode->getAABB().hit(ray, tmp_left);
-            bool right_hit = rightNode->getAABB().hit(ray, tmp_right);
+            bool left_hit = leftNode->getAABB().hit(localRay, tmp_left);
+            bool right_hit = rightNode->getAABB().hit(localRay, tmp_right);
 
 
             // TODO DO WE NEED TO MAKE THIS VERIFICATION HERE? 
