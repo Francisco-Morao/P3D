@@ -49,11 +49,39 @@ HitRecord Triangle::hit(Ray& r) {
 	rec.t = FLT_MAX;  //not necessary
 	rec.isHit = false;  //not necessary
 
-	/* Calculate the normal */
-	Vector normal = (points[1] - points[0]) % (points[2] - points[1]);  //cross product
+    Vector edge1 = points[1] - points[0];
+    Vector edge2 = points[2] - points[0];
+
+    Vector pvec = r.direction % edge2;
+    float det = edge1 * pvec;
+
+	const float det_epsilon = 1e-8f;
+	if (fabs(det) < det_epsilon)
+        return rec;
+
+    float invDet = 1.0f / det;
+
+    Vector tvec = r.origin - points[0];
+    float u = (tvec * pvec) * invDet;
+    if (u < 0.0f || u > 1.0f)
+        return rec;
+
+    Vector qvec = tvec % edge1;
+    float v = (r.direction * qvec) * invDet;
+    if (v < 0.0f || u + v > 1.0f)
+        return rec;
+
+    float t = (edge2 * qvec) * invDet;
+
+    if (t <= EPSILON)
+        return rec;
+
+    Vector normal = edge1 % edge2;  //cross product
 	normal.normalize();
 
-	//PUT HERE YOUR CODE
+    rec.isHit = true;
+    rec.t = t;
+    rec.normal = normal;
 	
 	return (rec);
 }
@@ -82,8 +110,6 @@ Plane::Plane(Vector& P0, Vector& P1, Vector& P2)
 //
 // Ray/Plane intersection test.
 //
-
-
 HitRecord Plane::hit( Ray& r)
 {
 	HitRecord rec;
@@ -108,14 +134,43 @@ HitRecord Plane::hit( Ray& r)
 	return (rec);
 }
 
+
 HitRecord Sphere::hit(Ray& r)
 {
 	HitRecord rec;
 	rec.t = FLT_MAX;
 	rec.isHit = false;
 
-	//PUT HERE YOUR CODE
+	Vector d = r.direction;
+	Vector OC = center - r.origin; // OC = C - O
 	
+	float b = d * OC;
+	float c = OC * OC - SqRadius;
+
+	if (c > 0.0f) {
+		// ray outside 
+		if (b <= 0.0f) {
+			// ray pointing away from sphere
+			return rec;
+		}
+		float discriminant = b * b - c;
+		
+		if (discriminant <= 0) {
+			return rec; // no intersection
+		}
+
+		float sqrt_disc = sqrt(discriminant);
+
+		rec.t = b - sqrt_disc; // closer intersection
+	}
+	else {
+		// ray inside sphere
+		rec.t = b + sqrt(b * b - c); // farther intersection
+	}
+
+	rec.isHit = true;
+	rec.normal = (r.origin + r.direction * rec.t - center).normalize(); // normal at the hit poin
+
 	return (rec);
 }
 
@@ -124,7 +179,8 @@ AABB Sphere::GetBoundingBox() {
 	Vector a_min;
 	Vector a_max;
 
-	//PUT HERE YOUR CODE
+	a_min = center - Vector(radius) - Vector(EPSILON);
+	a_max = center + Vector(radius) + Vector(EPSILON);
 	
 	return(AABB(a_min, a_max));
 }
@@ -146,10 +202,84 @@ HitRecord aaBox::hit(Ray& ray)
 	rec.isHit = false;
 
 	float t0, t1; //entering and leaving points
+	Vector in, out; // normals
 
-	//PUT HERE YOUR CODE
-		return (rec);
-	
+	float ox = ray.origin.x, oy = ray.origin.y, oz = ray.origin.z;
+	float dx = ray.direction.x, dy = ray.direction.y, dz = ray.direction.z;
+
+	float tx_max, ty_max, tz_max;
+	float tx_min, ty_min, tz_min;
+
+	float a = 1.0 / dx;
+	if (a >= 0) {
+		tx_min = (min.x - ox) * a;
+		tx_max = (max.x - ox) * a;
+	}
+	else {
+		tx_min = (max.x - ox) * a;
+		tx_max = (min.x - ox) * a;
+	}
+
+	float b = 1.0 / dy;
+	if (b >= 0) {
+		ty_min = (min.y - oy) * b;
+		ty_max = (max.y - oy) * b;
+	}
+	else {
+		ty_min = (max.y - oy) * b;
+		ty_max = (min.y - oy) * b;
+	}
+
+	float c = 1.0 / dz;
+	if (c >= 0) {
+		tz_min = (min.z - oz) * c;
+		tz_max = (max.z - oz) * c;
+	}
+	else {
+		tz_min = (max.z - oz) * c;
+		tz_max = (min.z - oz) * c;
+	}
+
+	// find largest entering t value
+	if (tx_min > ty_min) {
+		t0 = tx_min;
+		in = (a>=0) ? Vector(-1, 0, 0): Vector(1, 0, 0);
+	}
+	else {
+		t0 = ty_min;
+		in = (b >= 0) ? Vector(0, -1, 0) : Vector(0, 1, 0);
+	}
+	if (tz_min > t0) {
+		t0 = tz_min;
+		in = (c >= 0) ? Vector(0, 0, -1) : Vector(0, 0, 1);
+	}
+
+	// find smallest leaving t value
+	if (tx_max < ty_max) {
+		t1 = tx_max;
+		out = (a >= 0) ? Vector(1, 0, 0) : Vector(-1, 0, 0);
+	}
+	else {
+		t1 = ty_max;
+		out = (b >= 0) ? Vector(0, 1, 0) : Vector(0, -1, 0);
+	}
+	if (tz_max < t1) {
+		t1 = tz_max;
+		out = (c >= 0) ? Vector(0, 0, 1) : Vector(0, 0, -1);
+	}
+
+	if (t0 < t1 && t1 > 0) {
+		rec.isHit = true;
+		if (t0 > 0) {
+			rec.t = t0;
+			rec.normal = in; // normal points against the ray
+		}
+		else {
+			rec.t = t1;
+			rec.normal = out; // normal points against the ray
+		}
+	}
+	return (rec);
 }
 
 

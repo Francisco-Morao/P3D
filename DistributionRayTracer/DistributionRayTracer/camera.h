@@ -75,7 +75,16 @@ public:
 	{
 		Vector ray_dir;
 
-		//PUT YOUR CODE HERE
+		Vector ray_d = eye.operator-(at); // ray origin is the camera position in the camera frame (eye-at)
+
+		float distance = ray_d.length();
+
+		float px = w * ((pixel_sample.x / res_x) - 0.5f);
+		float py = h * ((pixel_sample.y / res_y) - 0.5f);
+
+		ray_dir = u * (w * px) + v * (h * py) - n * distance;
+
+		ray_dir.normalize();
 
 		return Ray(eye, ray_dir);  
 	}
@@ -84,8 +93,19 @@ public:
 	{
 		Vector ray_dir;
 		Vector eye_offset;
+		float focal_distance;
 
-		//PUT YOUR CODE HERE
+		eye_offset = eye + u * lens_sample.x + v * lens_sample.y; // eye offset in camera frame
+
+		float px = w * ((pixel_sample.x / res_x) - 0.5f);
+		float py = h * ((pixel_sample.y / res_y) - 0.5f);
+
+		focal_distance = plane_dist * focal_ratio;
+
+		ray_dir = u * (focal_ratio * px - lens_sample.x) + v * (focal_ratio * py - lens_sample.y) + n * (-focal_distance);
+
+		ray_dir.normalize();
+
 		return Ray(eye_offset, ray_dir);
 	}
 };
