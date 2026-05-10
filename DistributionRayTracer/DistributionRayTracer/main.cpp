@@ -1,7 +1,7 @@
  ///////////////////////////////////////////////////////////////////////
 //
 // P3D Course
-// (c) 2026 by João Madeiras Pereira
+// (c) 2026 by Joï¿½o Madeiras Pereira
 //Distribution Ray Tracing P3F scenes and drawing points with Modern OpenGL
 // It explores parallelism through OMP
 //
@@ -81,6 +81,7 @@ BVH* bvh_ptr = NULL;
 
 int RES_X, RES_Y;
 
+float roughness = 0.0;
 
 int WindowHandle = 0;
 
@@ -192,8 +193,8 @@ void createBufferObjects()
 	glGenBuffers(2, VboId);
 	glBindBuffer(GL_ARRAY_BUFFER, VboId[0]);
 
-	/* Só se faz a alocação dos arrays glBufferData (NULL), e o envio dos pontos para a placa gráfica
-	é feito na drawPoints com GlBufferSubData em tempo de execução pois os arrays são GL_DYNAMIC_DRAW */
+	/* Sï¿½ se faz a alocaï¿½ï¿½o dos arrays glBufferData (NULL), e o envio dos pontos para a placa grï¿½fica
+	ï¿½ feito na drawPoints com GlBufferSubData em tempo de execuï¿½ï¿½o pois os arrays sï¿½o GL_DYNAMIC_DRAW */
 	glBufferData(GL_ARRAY_BUFFER, size_vertices, NULL, GL_DYNAMIC_DRAW);
 	glEnableVertexAttribArray(VERTEX_COORD_ATTRIB);
 	glVertexAttribPointer(VERTEX_COORD_ATTRIB, 2, GL_FLOAT, 0, 0, 0);
@@ -304,13 +305,18 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 
 		for (int i = 0; i < num_objects; i++)
 		{
-			//COMPLETE THE CODE
+			obj = scene->getObject(i);
+			HitRecord rec = obj->hit(ray);
+			if (rec.isHit && rec.t < closestHit.t) {
+				closestHit = rec;
+				hitObj = obj;
+			}
 		}
 
 		if (hitObj == NULL) {  // No intersected object
 			if (skybox_flg)  //skybox cubemap overrides background color 
-				//color_Acc = scene->GetSkyboxColor(ray);
-				color_Acc = (scene->GetBackgroundColor()); //just temporarily
+				color_Acc = scene->GetSkyboxColor(ray);
+				// color_Acc = (scene->GetBackgroundColor()); //just temporarily
 			else
 				color_Acc = (scene->GetBackgroundColor());
 
@@ -321,8 +327,8 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 	else if (Accel_Struct == GRID_ACC) {  // regular Grid
 		if (!grid_ptr->Traverse(ray, &hitObj, closestHit)) {
 			if (skybox_flg)
-				//color_Acc = scene->GetSkyboxColor(ray);
-				color_Acc = (scene->GetBackgroundColor()); //just temporarily
+				color_Acc = scene->GetSkyboxColor(ray);
+				//color_Acc = (scene->GetBackgroundColor()); //just temporarily
 			else
 				color_Acc = (scene->GetBackgroundColor());
 			return color_Acc.clamp();
@@ -332,8 +338,8 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 	else if (Accel_Struct == BVH_ACC) { //BVH
 		if (!bvh_ptr->Traverse(ray, &hitObj, closestHit)) {
 			if (skybox_flg)
-				//color_Acc = scene->GetSkyboxColor(ray);
-				color_Acc = (scene->GetBackgroundColor()); //just temporarily
+				color_Acc = scene->GetSkyboxColor(ray);
+				//color_Acc = (scene->GetBackgroundColor()); //just temporarily
 			else
 				color_Acc = (scene->GetBackgroundColor());
 			return color_Acc.clamp();
@@ -342,8 +348,223 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 
 	hitPoint = ray.origin + ray.direction * closestHit.t;
 	N = closestHit.normal;
+    N.normalize();
 
-	//CALCULATE THE COLOR OF THE PIXEL
+	Color Kd = hitObj->GetMaterial()->GetDiffColor();
+	Color Ks = hitObj->GetMaterial()->GetSpecColor();
+	float Kd_scalar = hitObj->GetMaterial()->GetDiffuse();
+	float Ks_scalar = hitObj->GetMaterial()->GetSpecular();
+	float n = hitObj->GetMaterial()->GetShine();
+	Material* mat = hitObj->GetMaterial();
+	Vector V = (ray.direction * -1.0f);
+	
+	// Shadows
+    for (int i = 0; i < num_lights; i++) {
+		Vector L = (scene->getLight(i)->position - hitPoint).normalize();
+		Vector H = (L + V).normalize();
+		Color emission = scene->getLight(i)->emission;
+
+		// Shadow ray
+		Ray shadow(hitPoint + N * EPSILON, L); // EPSILON SO WE DON'T INTERSECT WITH THE OBJECT ITSELF
+		bool inShadow = false;
+
+		// Soft shadows
+		if (scene->getLight(i)->type == QUAD) {
+
+			int gridRes = scene->getLight(i)->gridRes;
+			int area = scene->getLight(i)->area;
+			Ray softshadow;
+
+			if (spp > 0) { // with antialiasing
+
+				Vector lightPos = scene->getLight(i)->getAreaLightPoint(Vector(lightSample.x, lightSample.y, 0));
+
+				L = (lightPos - hitPoint).normalize();
+				H = (L + V).normalize();
+				float lightDist = (lightPos - hitPoint).length();
+				bool blocked = false;
+				softshadow.origin = hitPoint + N * EPSILON;
+
+                // TODO CHECK IF WE NEED TO NORMALIZE THE DIRECTION OF THE SHADOW RAY 
+                // FOR THE TRAVERSAL PROCEDURE IN THE ACCELERATION STRUCTURES
+                // OR IF WE SHOULD CONSIDER LENGTH BETWEEN HIT POINT AND LIGHT POSITION
+				softshadow.direction = L;
+
+                if (L * N > 0) {    // light is behind the surface
+                    if (Accel_Struct == NONE) {
+                        int num_objects = scene->getNumObjects();
+                        for (int j = 0; j < num_objects; j++) {
+                            HitRecord rec = scene->getObject(j)->hit(softshadow);
+                            if (rec.isHit && rec.t < lightDist) {
+                                blocked = true;
+                                break;
+                            }
+                        }
+                    }
+                    else if (Accel_Struct == GRID_ACC) {
+                        blocked = grid_ptr->Traverse(softshadow);
+                    }
+                    else if (Accel_Struct == BVH_ACC) {
+                        blocked = bvh_ptr->Traverse(softshadow);
+                    }
+
+					if (!blocked) {
+						float NL = max(0.0f, N * L);
+						float NH = max(0.0f, N * H);
+						color_Acc += emission * Kd_scalar * Kd * NL + emission * Ks_scalar * Ks * pow(NH, n);
+					}
+                } 
+			}
+			else { // without antialiasing
+
+				float sqrt_grid = sqrtf(gridRes);
+
+				for (int u = 0; u < sqrt_grid; u++) {
+					for (int v = 0; v < sqrt_grid; v++) {
+
+						Vector lightPos = scene->getLight(i)->getAreaLightPoint(Vector((u + 0.5f) / sqrt_grid, (v + 0.5f) / sqrt_grid, 0));
+						L = (lightPos - hitPoint).normalize();
+						H = (L + V).normalize();
+						float lightDist = (lightPos - hitPoint).length();
+						bool blocked = false;
+						softshadow.origin = hitPoint + N * EPSILON;
+
+                        // TODO CHECK IF WE NEED TO NORMALIZE THE DIRECTION OF THE SHADOW RAY 
+						softshadow.direction = L;
+
+						if (N * L > 0) {
+							if (Accel_Struct == NONE) {
+								int num_objects = scene->getNumObjects();
+								for (int j = 0; j < num_objects; j++) {
+									HitRecord rec = scene->getObject(j)->hit(softshadow);
+									if (rec.isHit && rec.t < lightDist) {
+										blocked = true;
+										break;
+									}
+								}
+							}
+							else if (Accel_Struct == GRID_ACC) {
+								blocked = grid_ptr->Traverse(softshadow);
+							}
+							else if (Accel_Struct == BVH_ACC) { //BVH
+								blocked = bvh_ptr->Traverse(softshadow);
+							}
+
+                            if (!blocked) {
+                                float NL = max(0.0f, N * L);
+                                float NH = max(0.0f, N * H);
+                                color_Acc += (emission * Kd_scalar * Kd * NL + emission * Ks_scalar * Ks * pow(NH, n)).operator*(1.0f / gridRes);
+                            }
+						}
+					}
+				}
+			}
+			continue;
+		}
+		if (scene->getLight(i)->type == PUNCTUAL) {
+            if (L * N > 0) {    // light is behind the surface
+                if (Accel_Struct == NONE) {  // no acceleration
+                    float lightDist = (scene->getLight(i)->position - hitPoint).length();
+
+                    int num_objects = scene->getNumObjects();
+                    for (int j = 0; j < num_objects; j++) {
+                        HitRecord rec = scene->getObject(j)->hit(shadow);
+                        if (rec.isHit && rec.t < lightDist) {
+                            inShadow = true;
+                            break;
+                        }
+                    }
+                }
+                else if (Accel_Struct == GRID_ACC) {  // regular Grid
+                    inShadow = grid_ptr->Traverse(shadow);
+                }
+                else if (Accel_Struct == BVH_ACC) { //BVH
+                    inShadow = bvh_ptr->Traverse(shadow);
+                }
+
+				if (!inShadow) { // not in shadow and light is in front of the surface
+					float NL = max(0.0f, N * L);
+					float NH = max(0.0f, N * H);
+					color_Acc += emission * Kd_scalar * Kd * NL + emission * Ks_scalar * Ks * pow(NH, n);
+				}
+            }
+		}
+	}
+
+	if (depth >= MAX_DEPTH) {
+		return color_Acc.clamp();
+	}
+	
+	if (mat->GetReflection() > 0 || mat->GetTransmittance() > 0) {
+		bool entering = (ray.direction * N) < 0.0f; // check if the ray is entering or exiting the object
+		float n1 = ior_1;
+		float n2 = mat->GetRefrIndex();
+
+		Vector N = entering ? N : N * (-1.0f); // normal should point against the ray direction
+		if (!entering) {
+			n2 = n1;
+			n1 = mat->GetRefrIndex();
+		}
+
+		float R0 = powf((n1 - n2) / (n1 + n2), 2.0f);
+
+		Vector v = ray.direction * (-1.0f); // view vector
+		Vector vt = N * (v * N) - v;
+		Vector t = vt;
+		t.normalize();
+
+		float sinThetai = vt.length();
+		float sinThetat = (n1 / n2) * sinThetai;
+
+		float cosThetai = sqrtf(1.0f - sinThetai * sinThetai);
+		float cosThetat = sqrtf(1.0f - sinThetat * sinThetat);
+        
+		float cos = (n1 > n2) ? cosThetat : cosThetai;
+		float kr = mat->GetTransmittance() > 0.0f ? R0 + (1.0f - R0) * pow(1.0f - cos, 5.0f) : 1.0f;
+
+		if (mat->GetReflection() > 0) {
+			// rRay = calculate ray in the reflected direction;
+			// rColor = rayTracing(scene, point, rRay direction, depth+1);
+			// reduce rColor by the specular reflection coefficient and add to color; }
+
+			Vector r = ray.direction - N * 2.0f * (ray.direction * N);
+			Color rColor;
+			Ray rRay;
+
+            if (roughness > 0)
+                r = r + rnd_unit_sphere() * roughness;
+                
+            r.normalize();
+            rRay.origin = hitPoint + N * EPSILON;
+			rRay.direction = r;
+			rColor = rayTracing(rRay, depth + 1, ior_1, lightSample);
+
+			color_Acc += rColor * kr * mat->GetReflection() * Ks; // modulate by the material's reflection coefficient and specular color
+		}
+
+		if (mat->GetTransmittance() > 0 && sinThetat < 1.0f) { // check for total internal reflection > 1
+			// tRay = calculate ray in the refracted direction;
+			// tColor = rayTracing(scene, point, tRay direction, depth+1);
+			// reduce tColor by the transmittance coefficient and add to color; }
+
+			Ray rRay;
+			rRay.origin = hitPoint - N * EPSILON; // refracted ray origin is slightly offset from the hit point in the opposite direction of the normal to avoid self-intersection
+			rRay.direction = t * sinThetat - N * cosThetat;
+			rRay.direction.normalize();
+
+			Color color = rayTracing(rRay, depth + 1, n2, lightSample);
+
+			if (!entering) { // Beer law 
+				if (Kd.r() > 0.0f || Kd.g() > 0.0f || Kd.b() > 0.0f) {
+					// Invert: absorb the complementary color so diffuse color = transmitted color
+					Color invAbsorb = Color(1.0f - Kd.r(), 1.0f - Kd.g(), 1.0f - Kd.b());
+					Color transmission = (invAbsorb * (-closestHit.t)).exp_();
+					color *= transmission;
+				}
+			}
+			color_Acc += color * mat->GetTransmittance() * (1 - kr);
+		}
+	}
 
 	return color_Acc.clamp();
 }
@@ -372,7 +593,7 @@ void renderScene()
 					Color color;
 					Ray ray;
 					Vector pixel_sample;  //viewport coordinates
-					Vector light_sample = Vector(0.0f, 0.0f, 0.0f); // sample in Light coordinates
+					Vector light_sample = Vector(rand_float(), rand_float(), 0.0f);// 
 
 					pixel_sample.x = x + rand_double();
 					pixel_sample.y = y + rand_double();
@@ -386,7 +607,7 @@ void renderScene()
 						ray = scene->GetCamera()->PrimaryRay(lens_sample, pixel_sample);
 					}
 					/////////PROGRAM THE FOLLOWING FUNCTION//////////////////////
-					color = rayTracing(ray, 1, 1.0, Vector(rand_float(), rand_float(), 0.0f));
+					color = rayTracing(ray, 1, 1.0, light_sample);
 
 					index_pos = 2 * (x + RES_X * y);
 					vertices[index_pos] = (float)x;
@@ -435,21 +656,35 @@ void renderScene()
 
 				////// ZONE B.1  -  Distribution Ray Tracer: pixel, area light and lens supersampling with jittering (or stratified)
 				if(AA) {  
+					std::vector<Vector> light_samples;
+					std::vector<Vector> pixel_samples;
+                    
+                    float n = sqrt(spp);
+                    for (int p = 0; p < n; p++) {
+                        for (int q = 0; q < n; q++) {
+                            pixel_samples.push_back(Vector((p + rand_float()) / n, (q + rand_float()) / n, 0.0f));
+                            light_samples.push_back(Vector((p + rand_float()) / n, (q + rand_float()) / n, 0.0f));
+                        }
+                    }
+                    
+                    // shuffle points in light samples
+                    for (int i = light_samples.size() - 1; i >= 0; i--) {
+                        int rand_index = rand() % light_samples.size();
+						std::swap(light_samples[i], light_samples[rand_index]);
+                    } 
+
 					#pragma omp parallel for
 					for (int p = 0; p < spp; p++) {
-						if(!DOF) ray = scene->GetCamera()->PrimaryRay(pixel_sample);
-						else {        // sample_unit_disk() returns [-1 1] and aperture is the diameter of the lens
+                        if(!DOF) 
+                            ray = scene->GetCamera()->PrimaryRay(Vector(x + pixel_samples[p].x, y + pixel_samples[p].y, 0.0f));
 
-							Vector lens_sample = rnd_unit_disk() * scene->GetCamera()->GetAperture() / 2.0f;  // lens sample in Camera coordinates
-
-							/////////PROGRAM THE FOLLOWING FUNCTION//////////////////////
-							ray = scene->GetCamera()->PrimaryRay(lens_sample, pixel_sample);
-						}
-
-						/////////PROGRAM THE FOLLOWING FUNCTION//////////////////////
-						color += rayTracing(ray, 1, 1.0, light_sample);
+                        else {        // sample_unit_disk() returns [-1 1] and aperture is the diameter of the lens
+                            Vector lens_sample = rnd_unit_disk() * scene->GetCamera()->GetAperture() / 2.0f;  // lens sample in Camera coordinates
+							ray = scene->GetCamera()->PrimaryRay(lens_sample, Vector(x + pixel_samples[p].x, y + pixel_samples[p].y, 0.0f));
+                        }
+                        color += rayTracing(ray, 1, 1.0, light_samples[p]);
 					}
-					color *= 1.0/((float)spp);
+					color *= 1.0f/(spp); //average the color by the number of samples
 				}
 
 				//ZONE B.2  - Whitted ray tracer  (without antialiasing)
@@ -458,9 +693,7 @@ void renderScene()
 					pixel_sample.x = x + 0.5f;  
 					pixel_sample.y = y + 0.5f;
 
-					/////////PROGRAM THE FOLLOWING FUNCTION//////////////////////
 					Ray ray1 = scene->GetCamera()->PrimaryRay(pixel_sample);
-					/////////PROGRAM THE FOLLOWING FUNCTION//////////////////////
 					color = rayTracing(ray1, 1, 1.0, light_sample);  //light_sample is a dummy variable in this case, 
 				}
 
