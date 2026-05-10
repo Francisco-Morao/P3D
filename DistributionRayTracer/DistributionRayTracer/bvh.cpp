@@ -50,7 +50,7 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 	// node.index can have a index of objects vector or a index of nodes vector
 	
 	if ((right_index - left_index) < Threshold) {
-		node->makeLeaf(left_index, right_index);
+		node->makeLeaf(left_index, right_index - left_index);
 		return;
 	}
 	Comparator comp;
