@@ -139,18 +139,13 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, HitRecord& hitRec) {
             bool left_hit = leftNode->getAABB().hit(localRay, tmp_left);
             bool right_hit = rightNode->getAABB().hit(localRay, tmp_right);
 
-
-            // TODO DO WE NEED TO MAKE THIS VERIFICATION HERE? 
             // if ray inside AABB
             if (leftNode->getAABB().isInside(localRay.origin)) {
-                left_hit = true;
                 tmp_left = 0.0f;
             }
             if (rightNode->getAABB().isInside(localRay.origin)) {
-                right_hit = true;
                 tmp_right = 0.0f;
             }
-            // END OF TODO
 
             if (left_hit && right_hit) {
                 if (tmp_left < tmp_right) {
@@ -220,19 +215,13 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
             bool left_hit = leftNode->getAABB().hit(localRay, tmp_left);
             bool right_hit = rightNode->getAABB().hit(localRay, tmp_right);
 
-
-            // TODO DO WE NEED TO MAKE THIS VERIFICATION HERE? 
             // if ray inside AABB
             if (leftNode->getAABB().isInside(localRay.origin)) {
-                left_hit = true;
                 tmp_left = 0.0f;
             }
             if (rightNode->getAABB().isInside(localRay.origin)) {
-                right_hit = true;
                 tmp_right = 0.0f;
             }
-            // END OF TODO
-
 
             if (left_hit && right_hit) {
                 hit_stack.push(StackItem(rightNode, tmp_right));
