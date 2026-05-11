@@ -125,29 +125,7 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, HitRecord& hitRec) {
 
     BVHNode* currentNode = nodes[0];
     Ray localRay = ray; //copy of the original ray to be transformed into local coordinates of each node
-    /*
-    LocalRay = Ray, CurrentNode = nodes[0] //Root
-    • Check LocalRay intersection with Root (world box)
-        – No hit => return false
-    • For (infinity)
-        – If (NOT CurrentNode.isLeaf())
-            • Intersection test with both child nodes
-                – Both nodes hit => Put the one furthest away on the stack. CurrentNode = closest node
-                    » continue
-                – Only one node hit => CurrentNode = hit node
-                    » continue
-                – No Hit: Do nothing (let the stack-popping code below be reached)
-        – Else // Is leaf
-            • For each primitive in leaf perform intersection testing
-                – Intersected => update tclosest and store ClosestHit
-        – EndIf
-        – Pop stack until you find a node with t < tclosest => CurrentNode = pop’d
-            • Stack is empty? => return ClosestHit (no closest hit => return false, otherwise return true)
-    • EndFor
-    */
 
-    // Check LocalRay intersection with Root (world box)
-    //		– No hit = > return false
     if (!currentNode->getAABB().hit(localRay, tmp)) {
         return false;
     }
@@ -224,29 +202,11 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
     float tmp;
     stack<StackItem> hit_stack;
     HitRecord rec;
-    /*
-    LocalRay = Ray, CurrentNode = nodes[0]; //root
-    • Check LocalRay intersection with Root (world box)
-        – No hit => return false
-    • For (infinity)
-        – If (NOT CurrentNode.isLeaf())
-            • Intersection test with both child nodes
-                – Both nodes hit => Put right one on the stack. CurrentNode = left node
-                    » Goto LOOP;
-                – Only one node hit => CurrentNode = hit node
-                    » Goto LOOP;
-                – No Hit: Do nothing (let the stack-popping code below be reached)
-        – Else // Is leaf
-            • For each primitive in leaf perform intersection testing
-                – Intersected => return true;
-        – EndIf
-        – Pop stack, CurrentNode = pop’d node
-            • Stack is empty => return false
-    • EndFor*/
 
     Ray localRay = ray; //copy of the original ray to be transformed into local coordinates of each node
     BVHNode* currentNode = nodes[0];
-
+    double length = localRay.direction.length(); //distance between light and intersection point
+    localRay.direction.normalize();
     if (!currentNode->getAABB().hit(localRay, tmp)) {
         return false;
     }
@@ -287,8 +247,7 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
         else {
             for (int i = currentNode->getIndex(); i < currentNode->getIndex() + currentNode->getNObjs(); i++) {
                 HitRecord tmpRec = objects[i]->hit(localRay);
-                // TODO DO WE NEED TO CHECK IF THE INTERSECTION IS CLOSER THAN THE LENGTH OF THE SHADOW RAY?
-                if (tmpRec.isHit) {
+                if (tmpRec.isHit && tmpRec.t < length) {
                     return true;
                 }
             }

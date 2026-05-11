@@ -384,11 +384,8 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 				float lightDist = (lightPos - hitPoint).length();
 				bool blocked = false;
 				softshadow.origin = hitPoint + N * EPSILON;
-
-                // TODO CHECK IF WE NEED TO NORMALIZE THE DIRECTION OF THE SHADOW RAY 
-                // FOR THE TRAVERSAL PROCEDURE IN THE ACCELERATION STRUCTURES
-                // OR IF WE SHOULD CONSIDER LENGTH BETWEEN HIT POINT AND LIGHT POSITION
-				softshadow.direction = L;
+                Vector L_unnormalized = (lightPos - hitPoint); 
+				softshadow.direction = Accel_Struct == NONE ? L : L_unnormalized;
 
                 if (L * N > 0) {    // light is behind the surface
                     if (Accel_Struct == NONE) {
@@ -429,8 +426,8 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 						bool blocked = false;
 						softshadow.origin = hitPoint + N * EPSILON;
 
-                        // TODO CHECK IF WE NEED TO NORMALIZE THE DIRECTION OF THE SHADOW RAY 
-						softshadow.direction = L;
+                        Vector L_unnormalized = (lightPos - hitPoint); 
+				        softshadow.direction = Accel_Struct == NONE ? L : L_unnormalized;
 
 						if (N * L > 0) {
 							if (Accel_Struct == NONE) {
@@ -463,6 +460,10 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 		}
 		if (scene->getLight(i)->type == PUNCTUAL) {
             if (L * N > 0) {    // light is behind the surface
+
+                Vector L_unnormalized = (scene->getLight(i)->position - hitPoint); 
+				shadow.direction = Accel_Struct == NONE ? L : L_unnormalized;
+
                 if (Accel_Struct == NONE) {  // no acceleration
                     float lightDist = (scene->getLight(i)->position - hitPoint).length();
 

@@ -55,10 +55,6 @@ HitRecord Triangle::hit(Ray& r) {
     Vector pvec = r.direction % edge2;
     float det = edge1 * pvec;
 
-	const float det_epsilon = 1e-8f;
-	if (fabs(det) < det_epsilon)
-        return rec;
-
     float invDet = 1.0f / det;
 
     Vector tvec = r.origin - points[0];
