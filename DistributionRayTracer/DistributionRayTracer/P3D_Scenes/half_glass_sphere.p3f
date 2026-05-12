@@ -1,0 +1,32 @@
+accel none
+spp 64
+bclr 0.678 0.761 0.953
+camera
+eye -0.3 0.5 4.479839 
+at 0 0 0
+up 0 1 0
+angle 45
+hither 1.0
+resolution 800 600
+aperture 0
+focal 1.5
+#light quad -1 4 -1 1 1 1 0.5 4 -1 -1 4 0.75 16
+light punctual -1 4 -1 1 1 1
+light punctual -3 1 5 1 1 1 
+mat 0.894 0.850 0.66 0.8 1 1 1 0 100 0 1
+p 3
+5.0 -0.5 -5.0
+-5.0 -0.5 -5.0
+-5.0 -0.5 5.0
+p 3
+5.0 -0.5 5.0
+5.0 -0.5 -5.0
+-5.0 -0.5 5.0
+
+# diffuse blue sphere
+mat 0.1 0.2 0.9 0.9 1 1 1 0.1 30 0 1
+s 0.0 0.0 0.0 0.5
+
+# thin glass wall covering half the sphere
+mat 0.9 0.9 0.95 0 1 1 1 0.1 80 0.9 1.5
+box -2.0 -0.6 0.8 0.0 0.8 0.85

@@ -82,6 +82,7 @@ BVH* bvh_ptr = NULL;
 int RES_X, RES_Y;
 
 float roughness = 0.0;
+float refract_roughness = 0.0f;
 
 int WindowHandle = 0;
 
@@ -528,10 +529,6 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 		float kr = mat->GetTransmittance() > 0.0f ? R0 + (1.0f - R0) * pow(1.0f - cos, 5.0f) : 1.0f;
 
 		if (mat->GetReflection() > 0) {
-			// rRay = calculate ray in the reflected direction;
-			// rColor = rayTracing(scene, point, rRay direction, depth+1);
-			// reduce rColor by the specular reflection coefficient and add to color; }
-
 			Vector r = ray.direction - Nf * 2.0f * (ray.direction * N);
 			Color rColor;
 			Ray rRay;
@@ -551,14 +548,18 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 		}
 
 		if (mat->GetTransmittance() > 0 && sinThetat < 1.0f) { // check for total internal reflection > 1
-			// tRay = calculate ray in the refracted direction;
-			// tColor = rayTracing(scene, point, tRay direction, depth+1);
-			// reduce tColor by the transmittance coefficient and add to color; }
-
+			Vector r = t * sinThetat - Nf * cosThetat;
+			Color rColor;
 			Ray rRay;
-			rRay.origin = hitPoint - Nf * EPSILON; // refracted ray origin is slightly offset from the hit point in the opposite direction of the normal to avoid self-intersection
-			rRay.direction = t * sinThetat - Nf * cosThetat;
-			rRay.direction.normalize();
+
+            if (refract_roughness > 0){ // To produce fuzziness in reflection
+                r = r + rnd_unit_sphere() * refract_roughness;
+				if (r * N < 0)
+					r = t * sinThetat - Nf * cosThetat;
+			}
+            r.normalize();
+            rRay.origin = hitPoint - Nf * EPSILON; 
+			rRay.direction = r;
 
 			Color color = rayTracing(rRay, depth + 1, n2, lightSample);
 
