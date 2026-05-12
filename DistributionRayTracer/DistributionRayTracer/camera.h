@@ -75,14 +75,14 @@ public:
 	{
 		Vector ray_dir;
 
-		Vector ray_d = eye.operator-(at); // ray origin is the camera position in the camera frame (eye-at)
+		Vector ray_d = eye - at; // ray origin is the camera position in the camera frame (eye-at)
 
 		float distance = ray_d.length();
 
-		float px = w * ((pixel_sample.x / res_x) - 0.5f);
-		float py = h * ((pixel_sample.y / res_y) - 0.5f);
+		float px = (pixel_sample.x / res_x) - 0.5f;
+		float py = (pixel_sample.y / res_y) - 0.5f;
 
-		ray_dir = u * (px) + v * (py) - n * distance;
+		ray_dir = u * px * w + v * py * h - n * distance;
 
 		ray_dir.normalize();
 

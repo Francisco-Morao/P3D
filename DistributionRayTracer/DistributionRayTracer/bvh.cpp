@@ -64,10 +64,9 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 		axis = 2; // z-axis
 
 	comp.dimension = axis;
-
 	std::sort(objects.begin() + left_index, objects.begin() + right_index, comp);
 
-	// mean com o centro dos centroids????
+	// Compute the mean of the centroids along the selected axis
     float centroid_sum = 0.0f;
     for (int i = left_index; i < right_index; i++) {
         centroid_sum += objects[i]->getCentroid().getAxisValue(axis);
@@ -80,6 +79,7 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
         split_index++;
     }
 
+	// Handle the case where all centroids are on one side of the mean
     if (split_index == left_index || split_index == right_index) {
         split_index = (left_index + right_index) / 2;
     }
@@ -97,6 +97,7 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 
 	node->makeNode(nodes.size()); // left child index in nodes vector
 
+	// Create child nodes and set their AABBs, add them to the nodes vector and recursively build them
 	BVHNode* left = new BVHNode();
 	BVHNode* right = new BVHNode();
 
@@ -126,6 +127,7 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, HitRecord& hitRec) {
     BVHNode* currentNode = nodes[0];
     Ray localRay = ray; //copy of the original ray to be transformed into local coordinates of each node
 
+	// if the ray doesn't hit the root node, it won't hit any of the child nodes
     if (!currentNode->getAABB().hit(localRay, tmp)) {
         return false;
     }
@@ -139,7 +141,7 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, HitRecord& hitRec) {
             bool left_hit = leftNode->getAABB().hit(localRay, tmp_left);
             bool right_hit = rightNode->getAABB().hit(localRay, tmp_right);
 
-            // if ray inside AABB
+			// if ray inside AABB, t needs to be to 0 so it does not consider the exit point as the hit point
             if (leftNode->getAABB().isInside(localRay.origin)) {
                 tmp_left = 0.0f;
             }
@@ -147,6 +149,7 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, HitRecord& hitRec) {
                 tmp_right = 0.0f;
             }
 
+			// if both hit, push the farther one to the stack and continue with the closer one
             if (left_hit && right_hit) {
                 if (tmp_left < tmp_right) {
                     hit_stack.push(StackItem(rightNode, tmp_right));
@@ -158,13 +161,14 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, HitRecord& hitRec) {
                 }
                 continue;
             }
+			// if only one hit, continue with that one
             else if (left_hit || right_hit) {
                 currentNode = left_hit ? leftNode : rightNode;
                 continue;
             }
             // else do nothing no hit
         }
-        else {
+		else { // leaf node, check intersection with the primitives
             for (int i = currentNode->getIndex(); i < currentNode->getIndex() + currentNode->getNObjs(); i++) {
                 rec = objects[i]->hit(localRay);
                 if (rec.isHit && rec.t < hitRec.t) {
@@ -202,6 +206,8 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
     BVHNode* currentNode = nodes[0];
     double length = localRay.direction.length(); //distance between light and intersection point
     localRay.direction.normalize();
+
+	// if the ray doesn't hit the root node, it won't hit any of the child nodes
     if (!currentNode->getAABB().hit(localRay, tmp)) {
         return false;
     }
@@ -215,7 +221,7 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
             bool left_hit = leftNode->getAABB().hit(localRay, tmp_left);
             bool right_hit = rightNode->getAABB().hit(localRay, tmp_right);
 
-            // if ray inside AABB
+			// if ray inside AABB t needs to be to 0 so it does not consider the exit point as the hit point
             if (leftNode->getAABB().isInside(localRay.origin)) {
                 tmp_left = 0.0f;
             }
@@ -223,17 +229,19 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
                 tmp_right = 0.0f;
             }
 
+			// if both hit, push the right one to the stack and continue with the left one
             if (left_hit && right_hit) {
                 hit_stack.push(StackItem(rightNode, tmp_right));
                 currentNode = leftNode;
                 continue;
             }
+			// if only one hit, continue with that one
             else if (left_hit || right_hit) {
                 currentNode = left_hit ? leftNode : rightNode;
                 continue;
             }
         }
-        else {
+		else { // leaf node, check intersection with the primitives
             for (int i = currentNode->getIndex(); i < currentNode->getIndex() + currentNode->getNObjs(); i++) {
                 HitRecord tmpRec = objects[i]->hit(localRay);
                 if (tmpRec.isHit && tmpRec.t < length) {

@@ -59,17 +59,17 @@ HitRecord Triangle::hit(Ray& r) {
 
     Vector tvec = r.origin - points[0];
     float u = (tvec * pvec) * invDet;
-    if (u < 0.0f || u > 1.0f)
+	if (u < 0.0f || u > 1.0f) // barycentric coordinate check
         return rec;
 
     Vector qvec = tvec % edge1;
     float v = (r.direction * qvec) * invDet;
-    if (v < 0.0f || u + v > 1.0f)
+	if (v < 0.0f || u + v > 1.0f) // barycentric coordinate check
         return rec;
 
     float t = (edge2 * qvec) * invDet;
 
-    if (t <= EPSILON)
+	if (t <= EPSILON) // check if the intersection is behind the ray origin
         return rec;
 
     Vector normal = edge1 % edge2;  //cross product
@@ -144,14 +144,13 @@ HitRecord Sphere::hit(Ray& r)
 	float c = OC * OC - SqRadius;
 
 	if (c > 0.0f) {
-		// ray outside 
-		if (b <= 0.0f) {
-			// ray pointing away from sphere
-			return rec;
+		// ray outside sphere
+		if (b <= 0.0f) { // ray pointing away from sphere
+			return rec; // no intersection
 		}
 		float discriminant = b * b - c;
 		
-		if (discriminant <= 0) {
+		if (discriminant <= 0) { // ray misses the sphere
 			return rec; // no intersection
 		}
 
@@ -165,7 +164,7 @@ HitRecord Sphere::hit(Ray& r)
 	}
 
 	rec.isHit = true;
-	rec.normal = (r.origin + r.direction * rec.t - center).normalize(); // normal at the hit poin
+	rec.normal = (r.origin + r.direction * rec.t - center).normalize(); // normal at the hit point
 
 	return (rec);
 }

@@ -360,6 +360,7 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 	
 	// Shadows
     for (int i = 0; i < num_lights; i++) {
+		// L vector points from the hit point to the light source
 		Vector L = (scene->getLight(i)->position - hitPoint).normalize();
 		Vector H = (L + V).normalize();
 		Color emission = scene->getLight(i)->emission;
@@ -384,7 +385,9 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 				float lightDist = (lightPos - hitPoint).length();
 				bool blocked = false;
 				softshadow.origin = hitPoint + N * EPSILON;
-                Vector L_unnormalized = (lightPos - hitPoint); 
+                
+				Vector L_unnormalized = (lightPos - hitPoint); 
+				// If it is Grid or BVH, we need to have in consideration the length of the shadow ray
 				softshadow.direction = Accel_Struct == NONE ? L : L_unnormalized;
 
                 if (L * N > 0) {    // light is behind the surface
@@ -426,7 +429,8 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 						bool blocked = false;
 						softshadow.origin = hitPoint + N * EPSILON;
 
-                        Vector L_unnormalized = (lightPos - hitPoint); 
+                        Vector L_unnormalized = (lightPos - hitPoint);
+						// If it is Grid or BVH, we need to have in consideration the length of the shadow ray
 				        softshadow.direction = Accel_Struct == NONE ? L : L_unnormalized;
 
 						if (N * L > 0) {
@@ -509,8 +513,7 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 
 		float R0 = powf((n1 - n2) / (n1 + n2), 2.0f);
 
-		Vector v = ray.direction * (-1.0f); // view vector
-		Vector vt = Nf * (v * Nf) - v;
+		Vector vt = Nf * (V * Nf) - V;
 		Vector t = vt;
 		t.normalize();
 
@@ -520,6 +523,7 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 		float cosThetai = sqrtf(1.0f - sinThetai * sinThetai);
 		float cosThetat = sqrtf(1.0f - sinThetat * sinThetat);
         
+		// use cos(theta_t) if the ray is exiting the object and cos(theta_i) if it is entering
 		float cos = (n1 > n2) ? cosThetat : cosThetai;
 		float kr = mat->GetTransmittance() > 0.0f ? R0 + (1.0f - R0) * pow(1.0f - cos, 5.0f) : 1.0f;
 
@@ -532,7 +536,7 @@ Color rayTracing(Ray ray, int depth, float ior_1, Vector lightSample)  //index o
 			Color rColor;
 			Ray rRay;
 
-            if (roughness > 0){
+            if (roughness > 0){ // To produce fuzziness in reflection
                 r = r + rnd_unit_sphere() * roughness;
 				if (r * N < 0)
 					r = ray.direction - Nf * 2.0f * (ray.direction * N);
@@ -662,8 +666,9 @@ void renderScene()
 				if(AA) {  
 					std::vector<Vector> light_samples;
 					std::vector<Vector> pixel_samples;
-                    
                     float n = sqrt(spp);
+
+					// fill the pixel_samples and light_samples vectors with jittered samples
                     for (int p = 0; p < n; p++) {
                         for (int q = 0; q < n; q++) {
                             pixel_samples.push_back(Vector((p + rand_float()) / n, (q + rand_float()) / n, 0.0f));
