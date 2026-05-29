@@ -16,7 +16,7 @@ bool NEE = true;
 const float c_minCameraAngle = 0.01f;
 const float c_maxCameraAngle = (pi - 0.01f);
 vec3 c_cameraAt = vec3(0.0f, 0.0f, 0.0f);
-float c_cameraDistance = 10.0f;
+float c_cameraDistance = 40.0f;
 const float c_zoomMin = 2.0;
 const float c_zoomMax = 80.0;
 const float c_zoomSpeed = 0.2;  // distance units per pixel dragged
@@ -617,31 +617,13 @@ float readZoom() {
 }
 
 void CameraConfig(inout float aperture, inout float distToFocus) {
-    if (SCENE == 1 || SCENE == 2)
+    if (SCENE == 4)
     {
-        c_cameraDistance = 50.0f;
-        c_cameraAt = vec3(10.0f, 0.0f, 10.0f);
-        aperture = 0.0f;
-        distToFocus = 1.0f;
-    }
-    else if (SCENE == 4)
-    {
-        c_cameraDistance = 10.0f;
-        c_cameraAt = vec3(2.0f, 1.0f, 0.0f);
         aperture = 15.0f;
         distToFocus = 10.0f;
     }
-    else if (SCENE == 5)
-    {
-        c_cameraDistance = 60.0f;
-        c_cameraAt = vec3(10.0f, 0.0f, 10.0f);
-        aperture = 0.0f;
-        distToFocus = 1.0f;
-    }
     else
     {
-        c_cameraDistance = 20.0f;
-        c_cameraAt = vec3(10.0f, 0.0f, 10.0f);
         aperture = 0.0f;
         distToFocus = 1.0f;
     }
