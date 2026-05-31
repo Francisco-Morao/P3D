@@ -308,9 +308,9 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
         float dt = dot(rIn.d, outwardNormal);
         float discriminant = 1.0 - niOverNt * niOverNt * (1.0 - dt * dt);
 
-        if (discriminant > 0.0)  
+        if (discriminant > 0.0) // total reflection only if discriminant <= 0, otherwise use Schlick's approximation for reflectance
             reflectProb = schlick(cosine, rec.material.refIdx);  
-        else 
+        else // total reflection
             reflectProb = 1.0;
 
         if( hash1(gSeed) < reflectProb)  //Reflection
