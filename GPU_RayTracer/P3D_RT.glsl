@@ -8,10 +8,10 @@
  #iChannel0 "self"
 
 #define MAX_SAMPLES 10000.0
-#define SCENE 6
+#define SCENE 1
 
 bool russianRoulette = true;
-bool NEE = true;
+bool NEE = false;
 
 const float c_minCameraAngle = 0.01f;
 const float c_maxCameraAngle = (pi - 0.01f);
@@ -180,6 +180,7 @@ bool hit_world(Ray r, float tmin, float tmax, inout HitRecord rec)
     // Scene 3 = hollow sphere with orbiting metallic spheres 
     // Scene 4 = DOF scene
     // Scene 5 = complex Cornell box scene
+    // Scene 6 = Blue Diamond
 
     #if SCENE == 0       //Shirley Weekend scene
 
@@ -284,7 +285,6 @@ bool hit_world(Ray r, float tmin, float tmax, inout HitRecord rec)
             }
         }
     #elif SCENE == 1 //from https://blog.demofox.org/2020/06/14/casual-shadertoy-path-tracing-3-fresnel-rough-refraction-absorption-orbit-camera/
-
         // diffuse floor
         
             vec3 A = vec3(-25.0f, -12.5f, 10.0f);
@@ -625,10 +625,11 @@ bool hit_world(Ray r, float tmin, float tmax, inout HitRecord rec)
             }
         }
 
+
     #elif SCENE == 6
 
-        // backgroundColor1 = vec3(0.0, 0.0, 1.0);
-        // backgroundColor2 = vec3(0.0, 0.5, 0.5);
+        backgroundColor1 = vec3(0.0, 0.05, 0.2);
+        backgroundColor2 = vec3(0.0, 0.2, 0.6);
 
         for(int i = 0; i < 178; i++)
         {
@@ -640,20 +641,43 @@ bool hit_world(Ray r, float tmin, float tmax, inout HitRecord rec)
             }
         }
 
-         // light
-        
+        // main blue light from above
         {
-            vec3 A = vec3(-5.0f, 12.3f,  2.5f);
-            vec3 B = vec3( 5.0f, 12.3f,  2.5f);
-            vec3 C = vec3( 5.0f, 12.3f,  -2.5f);
-            vec3 D = vec3(-5.0f, 12.3f,  -2.5f);
-
-             if(hit_quad(createQuad(A, B, C, D), r, tmin, rec.t, rec))
+            vec3 A = vec3(-5.0,  8.0, -5.0);
+            vec3 B = vec3( 5.0,  8.0, -5.0);
+            vec3 C = vec3( 5.0,  8.0,  5.0);
+            vec3 D = vec3(-5.0,  8.0,  5.0);
+            if(hit_quad(createQuad(A, B, C, D), r, tmin, rec.t, rec))
             {
                 hit = true;
                 rec.material = createDiffuseMaterial(vec3(0.0));
-                rec.material.emissive = vec3(0.0f, 0.9f, 0.9f) * 20.0f;
+                rec.material.emissive = vec3(0.2, 0.4, 1.0) * 20.0;
             }
+        }
+
+        // secondary white-blue fill light from the side
+        {
+            vec3 A = vec3(-8.0, -2.0, -2.0);
+            vec3 B = vec3(-8.0, -2.0,  2.0);
+            vec3 C = vec3(-8.0,  4.0,  2.0);
+            vec3 D = vec3(-8.0,  4.0, -2.0);
+            if(hit_quad(createQuad(A, B, C, D), r, tmin, rec.t, rec))
+            {
+                hit = true;
+                rec.material = createDiffuseMaterial(vec3(0.0));
+                rec.material.emissive = vec3(0.4, 0.6, 1.0) * 10.0;
+            }
+        }
+
+        // ground plane — dark so diamond reflections pop
+        if(hit_quad(createQuad(
+            vec3(-10.0, -1.5, -10.0),
+            vec3( 10.0, -1.5, -10.0),
+            vec3( 10.0, -1.5,  10.0),
+            vec3(-10.0, -1.5,  10.0)), r, tmin, rec.t, rec))
+        {
+            hit = true;
+            rec.material = createDiffuseMaterial(vec3(0.02, 0.02, 0.08));
         }
     #endif
 
@@ -720,7 +744,7 @@ vec3 rayColor(Ray r)
             
             //calculate direct lighting with 3 white point lights:
             if (NEE) {
-                // col += directlighting(createPointLight(vec3(-10.0, 15.0, 0.0), vec3(1.0, 1.0, 1.0)), r, rec) * throughput;
+                col += directlighting(createPointLight(vec3(-10.0, 15.0, 0.0), vec3(1.0, 1.0, 1.0)), r, rec) * throughput;
                 // col += directlighting(createPointLight(vec3(8.0, 15.0, 3.0), vec3(1.0, 1.0, 1.0)), r, rec) * throughput;
                 // col += directlighting(createPointLight(vec3(1.0, 15.0, -9.0), vec3(1.0, 1.0, 1.0)), r, rec) * throughput;                    
             }
